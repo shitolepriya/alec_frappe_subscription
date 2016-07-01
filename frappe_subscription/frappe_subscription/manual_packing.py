@@ -52,19 +52,26 @@ def pack_manualy(delivery_note):
 		dn.pack_manualy = 1
 		dn.save(ignore_permissions = True)
 	else:
+		i_count = 0
 		item_pack = []
 		for item in dn.items:
 			unique_item = frappe.db.get_values("Item", {"name":item.item_code}, ["unique_box_for_packing", "box"], as_dict=True)
 			if unique_item and unique_item[0]['unique_box_for_packing'] == 1:
 				item_pack.append(item.item_code)
-		manual_packing_for_unique_box(delivery_note, item_pack)
+				i_count = i_count + 1
+		
+		if len(dn.items) == i_count :
+			status = "Manual Packing Slips Created"
+		else:
+			status = "Manual Partialy Packed"
+		manual_packing_for_unique_box(delivery_note, status, item_pack)
 
 		# dn.dn_status = "Manual Partialy Packed"
 		# dn.pack_manualy = 1
 		# dn.save(ignore_permissions = True)	
 	return dn.dn_status
 
-def manual_packing_for_unique_box(delivery_note, item_pack):
+def manual_packing_for_unique_box(delivery_note, status, item_pack):
 	dn = frappe.get_doc(json.loads(delivery_note))
 	for i in item_pack:
 		item_dtls = frappe.db.sql("""select dni.custom_qty, dni.custom_uom from `tabDelivery Note` dn, 
@@ -108,15 +115,15 @@ def manual_packing_for_unique_box(delivery_note, item_pack):
 				ps.flags.ignore_permissions = 1
 				ps.docstatus = 1
 				ps.save()
-			
+				
 				psd = dn.append('packing_slip_details', {})
 				psd.item_code = box
 				psd.item_name = frappe.db.get_value("Item",box,"item_name")
 				psd.packing_slip = ps.name
 				psd.tracking_id = "NA"
 				psd.tracking_status = "Not Packed"
-
-	dn.dn_status = "Manual Partialy Packed"
+				
+	dn.dn_status = status
 	dn.pack_manualy = 1
 	dn.save(ignore_permissions = True)
 	return dn.dn_status
